@@ -1,16 +1,24 @@
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { PieceColor, Difficulty } from '../types';
+import { GoogleGenerativeAI, GenerateContentResponse } from "@google/generative-ai"; // Corrected class name and package import
+import { PieceColor, Difficulty } from '@/types';
 import { ChessLogic } from './chessLogic';
 
-const API_KEY = process.env.API_KEY;
+// For Next.js, environment variables prefixed with NEXT_PUBLIC_ are exposed to the browser.
+// Ensure your .env.local or environment settings define NEXT_PUBLIC_API_KEY
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
-let ai: GoogleGenAI | null = null;
+let ai: GoogleGenerativeAI | null = null; // Corrected type
 if (API_KEY) {
-  ai = new GoogleGenAI({ apiKey: API_KEY });
+  ai = new GoogleGenerativeAI(API_KEY); // Corrected instantiation: pass API_KEY directly
 } else {
-  console.warn("API_KEY environment variable not set. Gemini API calls will be disabled. AI will use random moves.");
+  console.warn("NEXT_PUBLIC_API_KEY environment variable not set. Gemini API calls will be disabled. AI will use random moves.");
 }
 
+/**
+ * Generates a system prompt for the Gemini AI based on the selected difficulty.
+ * This guides the AI's chess-playing style.
+ * @param difficulty The chosen difficulty level.
+ * @returns A string containing the system instruction for the AI.
+ */
 const getSystemPrompt = (difficulty: Difficulty): string => {
   let systemMessageBase = `You are a chess AI. You will be given the current board state in FEN (Forsyth-Edwards Notation) and whose turn it is. 
 Your goal is to choose a valid chess move for the specified player. 
@@ -34,20 +42,33 @@ The current player is indicated in the FEN string. If it's 'w', it's White's tur
   return systemMessageBase;
 };
 
+/**
+ * Determines the AI's temperature (creativity/randomness) based on difficulty.
+ * Lower temperature means more deterministic/conservative moves.
+ * @param difficulty The chosen difficulty level.
+ * @returns A number representing the temperature (0.0 to 1.0).
+ */
 const getTemperatureForDifficulty = (difficulty: Difficulty): number => {
   switch (difficulty) {
-    case 1: return 0.7;
+    case 1: return 0.7; // More random
     case 2: return 0.5;
     case 3: return 0.3;
-    case 4: return 0.1;
+    case 4: return 0.1; // Less random, more focused
     default: return 0.5;
   }
 }
 
+/**
+ * Fetches an AI move from the Gemini API or falls back to a random move if API is not available or fails.
+ * @param chessLogic The current ChessLogic instance to get FEN and player info.
+ * @param difficulty The difficulty level for the AI.
+ * @param validMovesForAI A list of valid UCI moves for the AI to choose from.
+ * @returns A promise that resolves to the chosen AI move in UCI format, or null if no valid move can be made.
+ */
 export const getAIMove = async (
-  chessLogic: ChessLogic, // Pass the whole instance
+  chessLogic: ChessLogic, 
   difficulty: Difficulty,
-  validMovesForAI: string[] // e.g. ["e2e4", "g1f3"]
+  validMovesForAI: string[] 
 ): Promise<string | null> => {
   if (!ai) {
     console.warn("Gemini AI not initialized. Falling back to random move.");
@@ -63,34 +84,46 @@ export const getAIMove = async (
   const temperature = getTemperatureForDifficulty(difficulty);
   const userPrompt = `Current board (FEN): ${fen}\nIt is ${currentPlayer === PieceColor.WHITE ? 'White (w)' : 'Black (b)'}'s turn. Choose your move in UCI format. Valid moves include: ${validMovesForAI.join(', ')}.`;
   
-  // console.log("Sending to Gemini:", { systemPrompt, userPrompt, fen, temperature });
-
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-preview-04-17',
-      contents: userPrompt,
-      config: {
-        systemInstruction: systemPrompt,
+    const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash-preview-04-17' }); 
+    const result = await model.generateContent({ 
+      // CORRECTED: systemInstruction is a top-level property of the request
+      systemInstruction: systemPrompt, 
+      // CORRECTED: contents format is an array of objects with 'role' and 'parts'
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }], 
+      generationConfig: {
         temperature: temperature, 
-        topP: 0.95, // Setting topP might not be strictly necessary with very low temperatures, but can be kept
-        thinkingConfig: { thinkingBudget: 0 } 
+        topP: 0.95, 
       }
+      // REMOVED: thinkingConfig is not a valid property for generateContent
     });
 
-    const aiMoveUci = response.text.trim().toLowerCase(); // Normalize to lowercase
-    // console.log("Gemini raw response:", aiMoveUci);
+    // CORRECTED: Access the text content from the response object.
+    // The 'GenerateContentResponse' itself does not have a 'text' property.
+    // The actual text is found within candidates[0].content.parts[0].text.
+    // Using optional chaining to safely access nested properties.
+    const aiMoveUci = result.response.candidates?.[0]?.content?.parts?.[0]?.text; 
 
-    const uciRegex = /^[a-h][1-8][a-h][1-8][qrnb]?$/; // Validates UCI format e.g. e2e4, e7e8q
-    if (!uciRegex.test(aiMoveUci)) {
+    // Ensure aiMoveUci is not null or undefined before proceeding
+    if (!aiMoveUci) {
+      console.warn("Gemini API did not return text content or content was empty. Falling back to random move.");
+      if (validMovesForAI.length > 0) return validMovesForAI[Math.floor(Math.random() * validMovesForAI.length)];
+      return null;
+    }
+
+    const trimmedAiMoveUci = aiMoveUci.trim().toLowerCase(); 
+    const uciRegex = /^[a-h][1-8][a-h][1-8][qrnb]?$/; 
+    
+    // Validate AI's proposed move format
+    if (!uciRegex.test(trimmedAiMoveUci)) {
       console.warn("Gemini proposed an invalidly formatted move:", aiMoveUci, "Falling back to random.");
       if (validMovesForAI.length > 0) return validMovesForAI[Math.floor(Math.random() * validMovesForAI.length)];
       return null;
     }
     
-    // Check if Gemini's move is in the list of pre-calculated valid moves
-    if (validMovesForAI.includes(aiMoveUci)) {
-      // console.log("Gemini proposed valid move:", aiMoveUci);
-      return aiMoveUci;
+    // Validate if AI's proposed move is actually a legal move from the pre-calculated list
+    if (validMovesForAI.includes(trimmedAiMoveUci)) {
+      return trimmedAiMoveUci;
     } else {
       console.warn("Gemini proposed a move not in the pre-calculated valid list:", aiMoveUci, "Valid moves:", validMovesForAI, "Falling back to random.");
       if (validMovesForAI.length > 0) return validMovesForAI[Math.floor(Math.random() * validMovesForAI.length)];

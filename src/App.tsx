@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import Board from './components/Board';
-import GameControls from './components/GameControls';
-import StatusBar from './components/StatusBar';
-import PromotionModal from './components/PromotionModal';
-import CookieBanner from './components/CookieBanner';
-import PrivacyPolicyPage from './components/PrivacyPolicyPage';
-import CookiePolicyPage from './components/CookiePolicyPage';
-import { ChessLogic } from './services/chessLogic';
-import { getAIMove } from './services/geminiService';
+import { useRouter } from 'next/router'; // IMPORTANT: Import useRouter for Next.js navigation
+
+// Adjust paths for components, services, types, etc., relative to pages/index.tsx
+// assuming your core game logic and components are still within the 'src/' directory
+import Board from '../src/components/Board';
+import GameControls from '../src/components/GameControls';
+import StatusBar from '../src/components/StatusBar';
+import PromotionModal from '../src/components/PromotionModal';
+import CookieBanner from '../src/components/CookieBanner'; // Keep if you want it on the game page
+
+import { ChessLogic } from '../src/services/chessLogic';
+import { getAIMove } from '../src/services/geminiService';
 import {
   BoardState as FullBoardState,
   SquareId,
@@ -18,13 +21,17 @@ import {
   PieceType,
   SquareState,
   Piece
-} from './types';
-import { DEFAULT_DIFFICULTY, BOARD_ROWS, BOARD_COLS } from './constants';
-import { getSquareCoordinates, getSquareId } from './utils/boardUtils';
+} from '../src/types';
+import { DEFAULT_DIFFICULTY, BOARD_ROWS, BOARD_COLS } from '../src/constants';
+import { getSquareCoordinates, getSquareId } from '../src/utils/boardUtils';
 
-type Page = 'game' | 'privacy' | 'cookie';
+// The 'Page' type and 'currentPage' state are no longer needed in this component
+// as Next.js's file-based routing manages page transitions.
+// type Page = 'game' | 'privacy' | 'cookie'; // REMOVED
 
-const App: React.FC = () => {
+const HomePage: React.FC = () => {
+  const router = useRouter(); // Initialize Next.js router for navigation
+
   const initialLogicInstance = useMemo(() => new ChessLogic(), []);
   const [chessLogicInstance, setChessLogicInstance] = useState<ChessLogic>(initialLogicInstance);
   const [gameState, setGameState] = useState<GameState>(() => getInitialGameState(initialLogicInstance));
@@ -32,7 +39,7 @@ const App: React.FC = () => {
   const [isAITurn, setIsAITurn] = useState<boolean>(false);
   const [isGameInProgress, setIsGameInProgress] = useState<boolean>(false);
   
-  const [currentPage, setCurrentPage] = useState<Page>('game');
+  // Keep showCookieBanner state as it's specific to this page's UI element
   const [showCookieBanner, setShowCookieBanner] = useState<boolean>(false);
 
   useEffect(() => {
@@ -204,9 +211,8 @@ const App: React.FC = () => {
     setIsGameInProgress(true);
   }, []);
 
+  // Removed currentPage check as it's the game page
   useEffect(() => {
-    if (currentPage !== 'game') return; // Only update game state if on game page
-
     const currentLogicPlayer = chessLogicInstance.getCurrentPlayer();
     const newBoardPieces: (Piece | null)[][] = chessLogicInstance.getBoard();
     const isCurrentlyInCheck = chessLogicInstance.isKingInCheck(currentLogicPlayer, newBoardPieces);
@@ -261,12 +267,11 @@ const App: React.FC = () => {
       isGameInProgress,
       gameState.isCheckmate,
       gameState.isStalemate,
-      gameState.winner,
-      currentPage // Rerun when page changes back to 'game'
+      gameState.winner
     ]);
 
+  // Removed currentPage check as it's the game page
   useEffect(() => {
-    if (currentPage !== 'game') return; // Only run AI logic if on game page
     let timeoutId: number | undefined;
 
     if (isAITurn && !gameState.isCheckmate && !gameState.isStalemate && isGameInProgress) {
@@ -310,7 +315,7 @@ const App: React.FC = () => {
         const aiThinkTime = Math.max(100, 100 * difficulty); 
 
         timeoutId = window.setTimeout(async () => {
-            if (gameState.isCheckmate || gameState.isStalemate || !isGameInProgress || !isAITurn || currentPage !== 'game') {
+            if (gameState.isCheckmate || gameState.isStalemate || !isGameInProgress || !isAITurn) {
                 if (isAITurn) setIsAITurn(false);
                 return;
             }
@@ -335,7 +340,7 @@ const App: React.FC = () => {
                 }
             }
             
-            if (gameState.isCheckmate || gameState.isStalemate || !isGameInProgress || !isAITurn || currentPage !== 'game') {
+            if (gameState.isCheckmate || gameState.isStalemate || !isGameInProgress || !isAITurn) {
                  if (isAITurn) setIsAITurn(false);
                  return;
             }
@@ -366,7 +371,7 @@ const App: React.FC = () => {
             window.clearTimeout(timeoutId);
         }
     };
-  }, [isAITurn, gameState.isCheckmate, gameState.isStalemate, chessLogicInstance, difficulty, performMove, isGameInProgress, gameState.currentPlayer, currentPage]);
+  }, [isAITurn, gameState.isCheckmate, gameState.isStalemate, chessLogicInstance, difficulty, performMove, isGameInProgress, gameState.currentPlayer]);
 
   const handleDifficultyChange = (level: Difficulty) => {
     if (!isGameInProgress) {
@@ -374,16 +379,18 @@ const App: React.FC = () => {
     }
   };
   
-  const navigateTo = (page: Page) => {
-    setCurrentPage(page);
-  }
+  // No longer needed 'navigateTo' for internal page routing
+  // const navigateTo = (page: Page) => {
+  //   setCurrentPage(page);
+  // }
 
-  if (currentPage === 'privacy') {
-    return <PrivacyPolicyPage onNavigateBack={() => navigateTo('game')} />;
-  }
-  if (currentPage === 'cookie') {
-    return <CookiePolicyPage onNavigateBack={() => navigateTo('game')} />;
-  }
+  // These checks are now handled by Next.js's file-based routing
+  // if (currentPage === 'privacy') {
+  //   return <PrivacyPolicyPage onNavigateBack={() => navigateTo('game')} />;
+  // }
+  // if (currentPage === 'cookie') {
+  //   return <CookiePolicyPage onNavigateBack={() => navigateTo('game')} />;
+  // }
 
   return (
     <div className="min-h-screen bg-slate-800 flex flex-col items-center justify-center p-2 sm:p-4 selection:bg-emerald-500 selection:text-white">
@@ -432,7 +439,7 @@ const App: React.FC = () => {
         <CookieBanner
           onAccept={handleAcceptCookies}
           onDecline={handleDeclineCookies}
-          onLearnMore={() => navigateTo('cookie')}
+          onLearnMore={() => router.push('/cookie')} // Corrected: Use router.push for Next.js navigation
         />
       )}
 
@@ -464,14 +471,14 @@ const App: React.FC = () => {
         <p className="mb-1">Powered by Naga Apparel.</p>
         <div className="space-x-3">
             <button 
-                onClick={() => navigateTo('privacy')} 
+                onClick={() => router.push('/privacy')} 
                 className="hover:text-emerald-400 transition-colors duration-200 underline"
                 aria-label="View Privacy Policy"
             >
                 Privacy Policy
             </button>
             <button 
-                onClick={() => navigateTo('cookie')} 
+                onClick={() => router.push('/cookie')} 
                 className="hover:text-emerald-400 transition-colors duration-200 underline"
                 aria-label="View Cookie Policy"
             >
@@ -483,4 +490,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+export default HomePage;
