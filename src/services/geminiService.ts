@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, GenerateContentResponse } from "@google/generative-ai"; // Corrected class name and package import
+import { GoogleGenerativeAI, GenerateContentResponse } from "@google/generative-ai";
 import { PieceColor, Difficulty } from '@/types';
 import { ChessLogic } from './chessLogic';
 
@@ -6,9 +6,9 @@ import { ChessLogic } from './chessLogic';
 // Ensure your .env.local or environment settings define NEXT_PUBLIC_API_KEY
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
-let ai: GoogleGenerativeAI | null = null; // Corrected type
+let ai: GoogleGenerativeAI | null = null;
 if (API_KEY) {
-  ai = new GoogleGenerativeAI(API_KEY); // Corrected instantiation: pass API_KEY directly
+  ai = new GoogleGenerativeAI(API_KEY);
 } else {
   console.warn("NEXT_PUBLIC_API_KEY environment variable not set. Gemini API calls will be disabled. AI will use random moves.");
 }
@@ -27,16 +27,16 @@ The current player is indicated in the FEN string. If it's 'w', it's White's tur
 
   switch (difficulty) {
     case 1:
-      systemMessageBase += "\nPlay as a beginner. Prefer simple pawn moves or developing knights and bishops. Try to capture opponent pieces if a safe capture is available. Avoid leaving your pieces where they can be captured for free (hanging pieces).";
+      systemMessageBase += "\nPlay as a beginner. Prefer simple pawn moves or developing knights and bishops. Try to capture opponent pieces if a safe capture is available. Avoid leaving your pieces where they can be captured for free (hanging pieces). Prioritize moving pawns and developing minor pieces. Do not play tricky moves or complex combinations. Keep your king safe, but don't overprotect if it means losing material.";
       break;
     case 2:
-      systemMessageBase += "\nPlay as an improving beginner. Focus on developing your pieces towards the center, ensuring your king is safe (consider castling), and capturing opponent's pieces. Look for simple one-move attacks or captures. Avoid obvious blunders and hanging your pieces.";
+      systemMessageBase += "\nPlay as an improving beginner. Focus on developing your pieces towards the center, ensuring your king is safe (consider castling), and capturing opponent's pieces. Look for simple one-move attacks or captures. Avoid obvious blunders and hanging your pieces. Attempt to control the center. Be aware of simple two-move threats.";
       break;
     case 3:
-      systemMessageBase += "\nPlay as an intermediate club player. Aim for material advantage, control of central squares, and good piece coordination. Look for basic tactical opportunities like forks, pins, and skewers (1-2 moves ahead). Defend against your opponent's immediate threats. Consider pawn structure and open files.";
+      systemMessageBase += "\nPlay as an intermediate club player. Aim for material advantage, control of central squares, and good piece coordination. Look for basic tactical opportunities like forks, pins, and skewers (1-2 moves ahead). Defend against your opponent's immediate threats. Consider pawn structure, open files, and bishop pair advantages. Try to exploit opponent weaknesses and create threats. Prioritize king safety and piece activity.";
       break;
     case 4:
-      systemMessageBase += "\nPlay as a strong, advanced chess player. Analyze the position for tactical combinations (forks, pins, skewers, discovered attacks) and strategic advantages (outposts, pawn weaknesses, space). Calculate variations carefully (2-3 moves ahead or more). Your goal is to play precise, strong chess, build up pressure, and convert advantages into a win. Be very mindful of king safety for both sides.";
+      systemMessageBase += "\nPlay as a strong, advanced chess player. Analyze the position for deep tactical combinations (forks, pins, skewers, discovered attacks, sacrifices, deflections) and strategic advantages (outposts, pawn weaknesses, space, piece coordination, initiative). Calculate variations carefully (3-5 moves ahead or more). Your goal is to play precise, strong chess, build up overwhelming pressure, and convert even small advantages into a decisive win. Be extremely mindful of king safety for both sides, look for forcing moves, and understand subtle positional nuances. Consider prophylactic moves to prevent opponent's plans. Play aggressively when appropriate, and defensively when necessary to secure your position.";
       break;
   }
   return systemMessageBase;
@@ -50,10 +50,10 @@ The current player is indicated in the FEN string. If it's 'w', it's White's tur
  */
 const getTemperatureForDifficulty = (difficulty: Difficulty): number => {
   switch (difficulty) {
-    case 1: return 0.7; // More random
-    case 2: return 0.5;
-    case 3: return 0.3;
-    case 4: return 0.1; // Less random, more focused
+    case 1: return 0.7; // More random, beginner-like
+    case 2: return 0.4; // Slightly more focused
+    case 3: return 0.2; // More deterministic
+    case 4: return 0.05; // Very deterministic, aiming for optimal play
     default: return 0.5;
   }
 }
@@ -87,24 +87,16 @@ export const getAIMove = async (
   try {
     const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash-preview-04-17' }); 
     const result = await model.generateContent({ 
-      // CORRECTED: systemInstruction is a top-level property of the request
       systemInstruction: systemPrompt, 
-      // CORRECTED: contents format is an array of objects with 'role' and 'parts'
       contents: [{ role: 'user', parts: [{ text: userPrompt }] }], 
       generationConfig: {
         temperature: temperature, 
         topP: 0.95, 
       }
-      // REMOVED: thinkingConfig is not a valid property for generateContent
     });
 
-    // CORRECTED: Access the text content from the response object.
-    // The 'GenerateContentResponse' itself does not have a 'text' property.
-    // The actual text is found within candidates[0].content.parts[0].text.
-    // Using optional chaining to safely access nested properties.
     const aiMoveUci = result.response.candidates?.[0]?.content?.parts?.[0]?.text; 
 
-    // Ensure aiMoveUci is not null or undefined before proceeding
     if (!aiMoveUci) {
       console.warn("Gemini API did not return text content or content was empty. Falling back to random move.");
       if (validMovesForAI.length > 0) return validMovesForAI[Math.floor(Math.random() * validMovesForAI.length)];
@@ -114,14 +106,12 @@ export const getAIMove = async (
     const trimmedAiMoveUci = aiMoveUci.trim().toLowerCase(); 
     const uciRegex = /^[a-h][1-8][a-h][1-8][qrnb]?$/; 
     
-    // Validate AI's proposed move format
     if (!uciRegex.test(trimmedAiMoveUci)) {
       console.warn("Gemini proposed an invalidly formatted move:", aiMoveUci, "Falling back to random.");
       if (validMovesForAI.length > 0) return validMovesForAI[Math.floor(Math.random() * validMovesForAI.length)];
       return null;
     }
     
-    // Validate if AI's proposed move is actually a legal move from the pre-calculated list
     if (validMovesForAI.includes(trimmedAiMoveUci)) {
       return trimmedAiMoveUci;
     } else {
