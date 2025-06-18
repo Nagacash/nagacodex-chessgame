@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Additional global styles if necessary, but prefer Tailwind utilities */
+body {
+  font-family: 'Sixtyfour', 'Inter', sans-serif; /* "Sixtyfour" added as primary, Inter as fallback */
+}
+/* Add smooth transitions for piece movements if possible via JS, or basic CSS */
+.chess-piece-transition {
+  transition: transform 0.2s ease-in-out;
+}
+.font-dynapuff { /* Custom class for DynaPuff if not using arbitrary values directly */
+    font-family: 'DynaPuff', cursive;
+}
+
+/* Typewriter animation class (also defined in tailwind.config.js keyframes/animation) */
+.animate-typewriter {
+  display: inline-block; /* Crucial for width animation to wrap content */
+  overflow: hidden; /* Ensures text is revealed by width animation */
+  white-space: nowrap; /* Keeps text on a single line */
+  border-right: .12em solid #34D399; /* The typewriter cursor */
+  letter-spacing: 0.05em; /* Optional: adjusts spacing between letters */
+  /* "Naga Codex AI Chess" has 19 characters, adjust steps in tailwind.config.js if title changes */
+}
