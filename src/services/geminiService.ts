@@ -20,43 +20,66 @@ if (API_KEY) {
  * @returns A string containing the system instruction for the AI.
  */
 const getSystemPrompt = (difficulty: Difficulty): string => {
-  let systemMessageBase = `You are a chess AI. You will be given the current board state in FEN (Forsyth-Edwards Notation) and whose turn it is. 
-Your goal is to choose a valid chess move for the specified player. 
-Output ONLY the move in UCI format (e.g., e2e4, e7e8q for promotion to Queen). Do not include any other text, reasoning, or apologies.
-The current player is indicated in the FEN string. If it's 'w', it's White's turn. If it's 'b', it's Black's turn.`;
+  // Use a template literal for better readability of multi-line strings
+  let systemMessageBase = `
+You are a powerful chess engine, simulating expert-level thinking without human bias.
+
+# 🎯 Goal:
+Given a FEN string, output 3–5 legal candidate moves in **UCI format** (e.g., e2e4, e7e8q), then select the **strongest move** to play based on deep evaluation. Do not explain or comment — only output valid UCI moves, one per line.
+
+# ⚙️ Core Rules:
+- All moves must be valid based on the FEN.
+- Assume you are playing for the side to move.
+- Do NOT return annotations, commentary, or any format except raw UCI.
+
+# 🧠 Thinking Process:
+1. **Parse the position** from the FEN and identify the active color.
+2. **Generate all legal moves** for the current player.
+3. **Evaluate each move** based on:
+   - **CRITICAL: Material preservation (DO NOT hang pieces, DO NOT allow free captures).**
+   - Material gain/loss (prioritize capturing opponent's hanging pieces).
+   - King safety (do not walk into check, castle early if safe).
+   - Center control.
+   - Development and piece activity.
+   - Tactical threats (pins, forks, skewers, discoveries, back rank mates).
+   - Strategic plans (pawn structure, open files, weak squares).
+   - **CRITICAL: Opponent's threats (identify and nullify immediate threats).**
+4. **Simulate 3–5 candidate lines**, calculate 3–4 plies deep.
+5. **Select the best move** from the candidate list using a heuristic score.
+
+# 🛡️ Defensive Principles:
+- **Prioritize protecting your own pieces.** A move that protects a threatened piece is often better than an aggressive but risky one.
+- **Never make a move that allows your piece to be captured for free (a blunder), unless it leads to an immediate, decisive checkmate or significant material gain.**
+- Always check if your opponent has a strong response to your move, especially a capture or check.
+- Keep your king safe, especially in the opening and middlegame.
+
+# 📝 Output Format:
+Respond ONLY with 3–5 candidate moves in UCI format (no comments or explanations), followed by a line with: 
+"best: <UCI_MOVE>"
+
+# ❌ Don't:
+- Use SAN notation (like Nf3).
+- Give explanations or reasoning.
+- Include punctuation, lists, or numbering.
+
+# ✅ Example:
+e2e4  
+d2d4  
+g1f3  
+best: e2e4
+`;
 
   switch (difficulty) {
-    case 1:
-      systemMessageBase += `
-Play as a beginner. Prefer simple pawn moves or developing knights and bishops. Try to capture opponent pieces if a safe capture is available. 
-Avoid leaving your pieces where they can be captured for free (hanging pieces). Prioritize moving pawns and developing minor pieces. 
-Do not play tricky moves or complex combinations. Keep your king safe, but don't overprotect if it means losing material.`;
-      break;
-    case 2:
-      systemMessageBase += `
-Play as an improving beginner. Focus on developing your pieces towards the center, ensuring your king is safe (consider castling), and capturing opponent's pieces. 
-Look for simple one-move attacks or captures. Avoid obvious blunders and hanging your pieces. Attempt to control the center. 
-Be aware of simple two-move threats.`;
-      break;
-    case 3:
-      systemMessageBase += `
-Play as an intermediate club player. Aim for material advantage, control of central squares, and good piece coordination. 
-Look for basic tactical opportunities like forks, pins, and skewers (1–2 moves ahead). Defend against your opponent's immediate threats. 
-Consider pawn structure, open files, and bishop pair advantages. Try to exploit opponent weaknesses and create threats. 
-Prioritize king safety and piece activity. Calculate 2–3 candidate moves and pick the strongest.`;
-      break;
-    case 4:
-      systemMessageBase += `
-Play as a strong, advanced chess player. Analyze the position for deep tactical combinations (forks, pins, skewers, discovered attacks, sacrifices, deflections) and strategic advantages (outposts, pawn weaknesses, space, piece coordination, initiative). 
-Calculate variations carefully (3–5 moves ahead or more). Your goal is to play precise, strong chess, build up overwhelming pressure, and convert even small advantages into a decisive win. 
-Be extremely mindful of king safety for both sides, look for forcing moves, and understand subtle positional nuances. 
-Consider prophylactic moves to prevent the opponent’s plans. Play aggressively when appropriate, and defensively when necessary to secure your position. 
-**Calculate 3–5 candidate moves and pick the strongest.**`;
-      break;
+    case 1: systemMessageBase += `\n# Difficulty: Beginner. Play simply. Avoid captures unless safe. Focus on developing pieces and castling. **Strongly avoid blunders or hanging pieces.**`; break;
+    case 2: systemMessageBase += `\n# Difficulty: Intermediate. Look 1-2 moves ahead. Avoid hanging pieces. Attempt to control the center. **Ensure immediate threats to your pieces are handled.**`; break;
+    case 3: systemMessageBase += `\n# Difficulty: Club-level. Calculate 2–3 moves. Create threats and look for basic tactics (forks, pins). Prioritize piece activity. **Actively look for and defend against opponent's threats and avoid material loss.**`; break;
+    case 4: systemMessageBase += `\n# Difficulty: Strong. Think 3–5 moves ahead. Prioritize initiative, deep tactical combinations, and long-term strategic advantages. Be ruthless in exploiting opponent errors. **Your top priority is solid defense and material integrity, never sacrificing material without clear compensation or a decisive attack.**`; break;
   }
 
+  // Trim to remove any leading/trailing whitespace from the entire prompt
   return systemMessageBase.trim();
 };
+
 /**
  * Determines the AI's temperature (creativity/randomness) based on difficulty.
  * Lower temperature means more deterministic/conservative moves.
@@ -110,27 +133,47 @@ export const getAIMove = async (
       }
     });
 
-    const aiMoveUci = result.response.candidates?.[0]?.content?.parts?.[0]?.text; 
+    const fullAiResponse = result.response.candidates?.[0]?.content?.parts?.[0]?.text; 
 
-    if (!aiMoveUci) {
+    if (!fullAiResponse) {
       console.warn("Gemini API did not return text content or content was empty. Falling back to random move.");
       if (validMovesForAI.length > 0) return validMovesForAI[Math.floor(Math.random() * validMovesForAI.length)];
       return null;
     }
 
-    const trimmedAiMoveUci = aiMoveUci.trim().toLowerCase(); 
+    // Split the response by lines and look for the "best: <UCI_MOVE>" line
+    const lines = fullAiResponse.split('\n');
+    let aiChosenUci: string | null = null;
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (trimmedLine.startsWith('best:')) {
+        aiChosenUci = trimmedLine.replace('best:', '').trim().toLowerCase();
+        break; // Found the best move, no need to check further
+      }
+    }
+
+    // If no "best:" line was found, or the extracted move is empty
+    if (!aiChosenUci) {
+        console.warn("Gemini response did not contain a 'best:' move. Falling back to random.");
+        if (validMovesForAI.length > 0) return validMovesForAI[Math.floor(Math.random() * validMovesForAI.length)];
+        return null;
+    }
+
     const uciRegex = /^[a-h][1-8][a-h][1-8][qrnb]?$/; 
     
-    if (!uciRegex.test(trimmedAiMoveUci)) {
-      console.warn("Gemini proposed an invalidly formatted move:", aiMoveUci, "Falling back to random.");
+    // Validate AI's proposed move format
+    if (!uciRegex.test(aiChosenUci)) { // Use aiChosenUci here directly
+      console.warn("Gemini proposed an invalidly formatted move (from 'best:' line):", aiChosenUci, "Falling back to random.");
       if (validMovesForAI.length > 0) return validMovesForAI[Math.floor(Math.random() * validMovesForAI.length)];
       return null;
     }
     
-    if (validMovesForAI.includes(trimmedAiMoveUci)) {
-      return trimmedAiMoveUci;
+    // Validate if AI's proposed move is actually a legal move from the pre-calculated list
+    if (validMovesForAI.includes(aiChosenUci)) { // Use aiChosenUci here directly
+      return aiChosenUci;
     } else {
-      console.warn("Gemini proposed a move not in the pre-calculated valid list:", aiMoveUci, "Valid moves:", validMovesForAI, "Falling back to random.");
+      console.warn("Gemini proposed a move not in the pre-calculated valid list:", aiChosenUci, "Valid moves:", validMovesForAI, "Falling back to random.");
       if (validMovesForAI.length > 0) return validMovesForAI[Math.floor(Math.random() * validMovesForAI.length)];
       return null;
     }
