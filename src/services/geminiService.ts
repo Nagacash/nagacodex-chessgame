@@ -27,21 +27,36 @@ The current player is indicated in the FEN string. If it's 'w', it's White's tur
 
   switch (difficulty) {
     case 1:
-      systemMessageBase += "\nPlay as a beginner. Prefer simple pawn moves or developing knights and bishops. Try to capture opponent pieces if a safe capture is available. Avoid leaving your pieces where they can be captured for free (hanging pieces). Prioritize moving pawns and developing minor pieces. Do not play tricky moves or complex combinations. Keep your king safe, but don't overprotect if it means losing material.";
+      systemMessageBase += `
+Play as a beginner. Prefer simple pawn moves or developing knights and bishops. Try to capture opponent pieces if a safe capture is available. 
+Avoid leaving your pieces where they can be captured for free (hanging pieces). Prioritize moving pawns and developing minor pieces. 
+Do not play tricky moves or complex combinations. Keep your king safe, but don't overprotect if it means losing material.`;
       break;
     case 2:
-      systemMessageBase += "\nPlay as an improving beginner. Focus on developing your pieces towards the center, ensuring your king is safe (consider castling), and capturing opponent's pieces. Look for simple one-move attacks or captures. Avoid obvious blunders and hanging your pieces. Attempt to control the center. Be aware of simple two-move threats.";
+      systemMessageBase += `
+Play as an improving beginner. Focus on developing your pieces towards the center, ensuring your king is safe (consider castling), and capturing opponent's pieces. 
+Look for simple one-move attacks or captures. Avoid obvious blunders and hanging your pieces. Attempt to control the center. 
+Be aware of simple two-move threats.`;
       break;
     case 3:
-      systemMessageBase += "\nPlay as an intermediate club player. Aim for material advantage, control of central squares, and good piece coordination. Look for basic tactical opportunities like forks, pins, and skewers (1-2 moves ahead). Defend against your opponent's immediate threats. Consider pawn structure, open files, and bishop pair advantages. Try to exploit opponent weaknesses and create threats. Prioritize king safety and piece activity.";
+      systemMessageBase += `
+Play as an intermediate club player. Aim for material advantage, control of central squares, and good piece coordination. 
+Look for basic tactical opportunities like forks, pins, and skewers (1–2 moves ahead). Defend against your opponent's immediate threats. 
+Consider pawn structure, open files, and bishop pair advantages. Try to exploit opponent weaknesses and create threats. 
+Prioritize king safety and piece activity. Calculate 2–3 candidate moves and pick the strongest.`;
       break;
     case 4:
-      systemMessageBase += "\nPlay as a strong, advanced chess player. Analyze the position for deep tactical combinations (forks, pins, skewers, discovered attacks, sacrifices, deflections) and strategic advantages (outposts, pawn weaknesses, space, piece coordination, initiative). Calculate variations carefully (3-5 moves ahead or more). Your goal is to play precise, strong chess, build up overwhelming pressure, and convert even small advantages into a decisive win. Be extremely mindful of king safety for both sides, look for forcing moves, and understand subtle positional nuances. Consider prophylactic moves to prevent opponent's plans. Play aggressively when appropriate, and defensively when necessary to secure your position.";
+      systemMessageBase += `
+Play as a strong, advanced chess player. Analyze the position for deep tactical combinations (forks, pins, skewers, discovered attacks, sacrifices, deflections) and strategic advantages (outposts, pawn weaknesses, space, piece coordination, initiative). 
+Calculate variations carefully (3–5 moves ahead or more). Your goal is to play precise, strong chess, build up overwhelming pressure, and convert even small advantages into a decisive win. 
+Be extremely mindful of king safety for both sides, look for forcing moves, and understand subtle positional nuances. 
+Consider prophylactic moves to prevent the opponent’s plans. Play aggressively when appropriate, and defensively when necessary to secure your position. 
+**Calculate 3–5 candidate moves and pick the strongest.**`;
       break;
   }
-  return systemMessageBase;
-};
 
+  return systemMessageBase.trim();
+};
 /**
  * Determines the AI's temperature (creativity/randomness) based on difficulty.
  * Lower temperature means more deterministic/conservative moves.

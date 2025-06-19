@@ -356,7 +356,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-800 flex flex-col items-center justify-center p-2 sm:p-4 selection:bg-emerald-500 selection:text-white">
       <header className="mb-4 sm:mb-6 text-center">
-        <h1 className="font-dynapuff text-4xl sm:text-5xl md:text-6xl font-bold text-emerald-400 animate-typewriter">
+        <h1 className="font-dynapuff text-5xl sm:text-5xl md:text-6xl font-bold text-emerald-400 animate-typewriter">
           Naga Codex AI Chess
         </h1>
       </header>
